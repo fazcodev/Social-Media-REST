@@ -76,7 +76,7 @@ router.get('/:username/posts', async (req, res) => {
   }
 });
 
-router.get('/posts/:id', async (req, res) => {
+router.get('/posts/:id', auth, async (req, res) => {
   const _id = req.params.id;
   try {
     const post = await Post.findOne({ _id });
@@ -84,7 +84,7 @@ router.get('/posts/:id', async (req, res) => {
       return res.status(404).json({ error: 'Post not found' });
     }
     // if found populate post with user info only name and username
-    await post.populate({ path: 'owner', select: 'name username avatarURL' });
+    await post.populate({ path: 'owner', select: 'name username avatarUrl' });
     if (post.imageName) {
       post.imageUrl = await getSignedUrl(
         s3,
@@ -95,8 +95,19 @@ router.get('/posts/:id', async (req, res) => {
         { expiresIn: 60 }
       );
     }
-    const likeCount = await Like.countDocuments({ post: post._id });
-    res.status(200).json({ ...post, likeCount });
+    const like = await Like.findOne({
+      post: post._id,
+      user: req.user._id,
+    });
+    const saved = await Saved.findOne({
+      post: post._id,
+      user: req.user._id,
+    });
+    post.isLiked = like ? true : false;
+    post.isSaved = saved ? true : false;
+    console.log(post);
+
+    res.status(200).json(post);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -271,7 +282,11 @@ router.get('/posts/:username/saved', auth, async (req, res) => {
   try {
     const saved = await Saved.find({
       user: req.user._id,
-    }).populate({ path: 'post', populate: { path: 'owner', select: 'name username avatarURL'  }, sort: { createdAt: -1 } });
+    }).populate({
+      path: 'post',
+      populate: { path: 'owner', select: 'name username avatarURL' },
+      sort: { createdAt: -1 },
+    });
     for (const index in saved) {
       if (saved[index].post.imageName) {
         saved[index].post.imageUrl = await getSignedUrl(

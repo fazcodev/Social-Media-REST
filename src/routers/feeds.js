@@ -23,11 +23,21 @@ router.get('/feeds', auth, async (req, res) => {
       'following'
     );
     const userIds = followings.map((following) => following.following);
-    const posts = await Post.find({ owner: { $in: userIds } })
-      .populate('owner', ['name', 'username', 'avatarURL'])
-      .sort({ createdAt: -1 })
-      .skip(parseInt(req.query.skip))
-      .limit(parseInt(req.query.limit));
+
+    let posts;
+    if (userIds.length === 0) {
+      posts = await Post.find()
+        .populate('owner', ['name', 'username', 'avatarURL'])
+        .sort({ createdAt: -1 })
+        .skip(parseInt(req.query.skip))
+        .limit(parseInt(req.query.limit));
+    } else {
+      posts = await Post.find({ owner: { $in: userIds } })
+        .populate('owner', ['name', 'username', 'avatarURL'])
+        .sort({ createdAt: -1 })
+        .skip(parseInt(req.query.skip))
+        .limit(parseInt(req.query.limit));
+    }
     for (const index in posts) {
       if (posts[index].imageName) {
         posts[index].imageUrl = await getSignedUrl(
@@ -46,8 +56,8 @@ router.get('/feeds', auth, async (req, res) => {
           post: posts[index]._id,
           user: req.user._id,
         });
-        posts[index].isLiked = (like ? true : false);
-        posts[index].isSaved = (saved ? true : false);
+        posts[index].isLiked = like ? true : false;
+        posts[index].isSaved = saved ? true : false;
       }
     }
     res.status(200).json(posts);

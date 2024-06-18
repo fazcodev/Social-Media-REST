@@ -26,7 +26,14 @@ router.post('/users', async (req, res) => {
   try {
     await user.save();
     const token = await user.generateAuthToken();
-    res.status(201).json({ user, token });
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: true, // set to false if testing locally over HTTP
+      sameSite: 'None', // use 'Lax' or 'Strict' for local testing without HTTPS
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    });
+    // res.status(201).json({ user, token });
+    res.status(201).json({ user });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
@@ -34,12 +41,22 @@ router.post('/users', async (req, res) => {
 
 router.post('/users/login', async (req, res) => {
   try {
+    // console.log('trying login')
     const user = await User.findByCredentials(
       req.body.username,
       req.body.password
     );
     const token = await user.generateAuthToken();
-    res.json({ user, token });
+    //  send a token as cookie
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: true, // set to false if testing locally over HTTP
+      sameSite: 'None', // use 'Lax' or 'Strict' for local testing without HTTPS
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    });
+    // res.status(201).json({ user, token });
+    res.status(201).json({ user });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
@@ -91,7 +108,7 @@ router.post(
           Key: user.avatarKey,
         }),
         // expires after 1week
-        { expiresIn: 60 * 60 * 24 * 6}
+        { expiresIn: 60 * 60 * 24 * 6 }
       );
       await user.save();
       res.json(user);
@@ -122,7 +139,7 @@ router.get('/users/me/user-suggestions', auth, async (req, res) => {
         $sort: { count: -1 },
       },
     ]);
-    if(suggestedUsers.length === 0){
+    if (suggestedUsers.length === 0) {
       suggestedUsers = await User.find({
         _id: { $nin: followedUserIds.concat(req.user._id) },
       });
@@ -143,7 +160,7 @@ router.get('/users/search', async (req, res) => {
     const searchQuery = req.query.q; // Get the search query from the request query string
     const skip = parseInt(req.query.skip) || 0; // Get the page number from the query or default to 1
     const limit = parseInt(req.query.limit) || 10; // Get the search query from the request query string
-    if (!searchQuery)return;
+    if (!searchQuery) return;
     const query = {
       $or: [
         { username: { $regex: searchQuery, $options: 'i' } }, // Case-insensitive username search
@@ -243,6 +260,11 @@ router.post('/users/logout', auth, async (req, res) => {
       return token.token !== req.token;
     });
     await req.user.save();
+    res.cookie('token', '', {
+      httpOnly: true,
+      secure: true,
+      expires: new Date(0), // Set the cookie's expiry date to the past
+    });
     res.json({ message: 'Logout successfully' });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -252,7 +274,13 @@ router.post('/users/logout', auth, async (req, res) => {
 router.post('/users/logoutall', auth, async (req, res) => {
   try {
     req.user.tokens = [];
+    console.log('hello');
     await req.user.save();
+    res.cookie('token', '', {
+      httpOnly: true,
+      secure: true,
+      expires: new Date(0), // Set the cookie's expiry date to the past
+    });
     res.json({ message: 'Logout successfully' });
   } catch (e) {
     res.status(500).json({ error: e.message });
