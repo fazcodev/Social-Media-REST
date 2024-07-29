@@ -26,7 +26,8 @@ router.get('/feeds', auth, async (req, res) => {
 
     let posts;
     if (userIds.length === 0) {
-      posts = await Post.find()
+      // If user is not following anyone then show all posts except user's own posts
+      posts = await Post.find({ owner: { $ne: req.user._id } })
         .populate('owner', ['name', 'username', 'avatarURL'])
         .sort({ createdAt: -1 })
         .skip(parseInt(req.query.skip))
