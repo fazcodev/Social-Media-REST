@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Like = require('./Like');
+const User = require('./User');
 const postSchema = mongoose.Schema(
   {
     description: {
@@ -34,7 +35,7 @@ const postSchema = mongoose.Schema(
     isSaved: {
       type: Boolean,
       default: false,
-    }
+    },
   },
   {
     timestamps: true,
@@ -51,6 +52,10 @@ postSchema.virtual('comments', {
   ref: 'Comment',
   localField: '_id',
   foreignField: 'post',
+});
+postSchema.pre('save', async function (next) {
+  const post = this;
+  next();
 });
 postSchema.pre('remove', async function (next) {
   const post = this;

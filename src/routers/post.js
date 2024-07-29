@@ -12,6 +12,7 @@ const {
   S3Client,
   GetObjectCommand,
   DeleteObjectCommand,
+  SSEKMSFilterSensitiveLog,
 } = require('@aws-sdk/client-s3');
 
 const s3 = new S3Client({
@@ -33,6 +34,10 @@ router.post('/posts', uploadImage.single('image'), auth, async (req, res) => {
   }
   try {
     await post.save();
+    await User.findOneAndUpdate(
+      { _id: req.user._id },
+      { $inc: { postsCnt: 1 } }
+    );
     res.status(201).json(post);
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -47,6 +52,8 @@ router.get('/:username/posts', async (req, res) => {
       path: 'posts',
       populate: { path: 'owner', select: 'name username avatarURL' },
       sort: { createdAt: -1 },
+      skip: req.query.skip ? parseInt(req.query.skip, 10) : 0,
+      limit: req.query.limit ? parseInt(req.query.limit, 10) : 3,
     });
     for (const index in user.posts) {
       if (user.posts[index].imageName) {
@@ -79,12 +86,12 @@ router.get('/:username/posts', async (req, res) => {
 router.get('/posts/:id', auth, async (req, res) => {
   const _id = req.params.id;
   try {
-    const post = await Post.findOne({ _id });
+    const post = await Post.findById(_id);
     if (!post) {
       return res.status(404).json({ error: 'Post not found' });
     }
     // if found populate post with user info only name and username
-    await post.populate({ path: 'owner', select: 'name username avatarUrl' });
+    await post.populate({ path: 'owner', select: 'name username avatarURL' });
     if (post.imageName) {
       post.imageUrl = await getSignedUrl(
         s3,
@@ -105,7 +112,6 @@ router.get('/posts/:id', auth, async (req, res) => {
     });
     post.isLiked = like ? true : false;
     post.isSaved = saved ? true : false;
-
     res.status(200).json(post);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -155,6 +161,11 @@ router.delete('/posts/:id', auth, async (req, res) => {
         })
       );
     }
+    await User.findOneAndUpdate(
+      { _id: req.user._id },
+      { $inc: { postsCnt: -1 } }
+    );
+
     res.status(200).json(post);
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -226,6 +237,11 @@ router.get('/posts/:id/comments', async (req, res) => {
     await post.populate({
       path: 'comments',
       populate: { path: 'user', select: 'name username avatarURL' },
+      options: {
+        sort: { createdAt: -1 },
+        skip: req.query.skip ? parseInt(req.query.skip, 10) : 0,
+        limit: req.query.limit ? parseInt(req.query.limit, 10) : 10,
+      },
     });
     res.status(200).json(post.comments);
   } catch (e) {

@@ -72,6 +72,7 @@ router.get('/explore', auth, async (req, res) => {
         );
       }
     }
+    // console.log(populatedPosts)
     res.status(200).json(populatedPosts);
   } catch (e) {
     console.error(e.message);

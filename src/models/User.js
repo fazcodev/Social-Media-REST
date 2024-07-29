@@ -79,6 +79,10 @@ const userSchema = mongoose.Schema(
     avatarURL: {
       type: String,
     },
+    postsCnt: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

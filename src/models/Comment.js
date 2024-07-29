@@ -22,7 +22,6 @@ const commentSchema = mongoose.Schema(
     timestamps: true,
   }
 );
-commentSchema.index({ user: 1, post: 1 }, { unique: true });
 
 const Comment = mongoose.model('Comment', commentSchema);
 
