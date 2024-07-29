@@ -257,7 +257,7 @@ router.delete('/users/:username/unfollow', auth, async (req, res) => {
 router.post('/users/logout', auth, async (req, res) => {
   try {
     req.user.tokens = req.user.tokens.filter((token) => {
-      return token.token !== req.token;
+      return token.token !== req.cookies.token;
     });
     await req.user.save();
     res.cookie('token', '', {
