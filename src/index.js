@@ -14,8 +14,8 @@ app.use(cookieParser());
 
 const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  origin: 'http://localhost:5000',
-  // origin: 'https://social-media-frontend-green.vercel.app',
+  // origin: 'http://localhost:5000',
+  origin: 'https://social-media-frontend-green.vercel.app',
   credentials: true, // Allow credentials (cookies, authorization headers, etc.)
 };
 
