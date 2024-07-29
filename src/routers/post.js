@@ -105,7 +105,6 @@ router.get('/posts/:id', auth, async (req, res) => {
     });
     post.isLiked = like ? true : false;
     post.isSaved = saved ? true : false;
-    console.log(post);
 
     res.status(200).json(post);
   } catch (e) {
