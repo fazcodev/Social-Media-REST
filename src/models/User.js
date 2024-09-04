@@ -23,7 +23,6 @@ const userSchema = mongoose.Schema(
     email: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       lowercase: true,
       validate(value) {
@@ -63,6 +62,10 @@ const userSchema = mongoose.Schema(
             type: String,
             required: true,
           },
+          expiresAt: {
+            type: Date,
+            default: Date.now() + 1000 * 60 * 60 * 3, // 3 hours
+          },
         },
       ],
       validate(value) {
@@ -72,6 +75,9 @@ const userSchema = mongoose.Schema(
           );
         }
       },
+    },
+    OAuth: {
+      type: String,
     },
     avatarKey: {
       type: String,
@@ -141,15 +147,26 @@ userSchema.methods.generateAuthToken = async function () {
   await user.save();
   return token;
 };
+userSchema.methods.saveOAuthToken = async function (token, OAuth) {
+  const user = this;
+  const newToken = jwt.sign(
+    { _id: user._id.toString(), token },
+    process.env.JWT_SECRET
+  );
+  user.tokens = user.tokens.concat({ token });
+  user.OAuth = OAuth;
+  await user.save();
+  return newToken;
+};
 
 userSchema.statics.findByCredentials = async (username, password) => {
   const user = await User.findOne({ username });
   if (!user) {
-    throw new Error('No user found');
+    throw new Error('Invalid username or password. Please try again.');
   }
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
-    throw new Error('Password is incorrect');
+    throw new Error('Invalid username or password. Please try again.');
   }
   return user;
 };
@@ -198,6 +215,19 @@ userSchema.pre('remove', async function (next) {
   await Follow.deleteMany({ following: user._id });
   next();
 });
+
+async function removeExpiredTokens() {
+  const now = new Date();
+
+  await User.updateMany(
+    { 'tokens.expiresAt': { $lt: now } },
+    { $pull: { tokens: { expiresAt: { $lt: now } } } }
+  );
+}
+
+// Schedule the job to run every hour, day, or as needed
+setInterval(removeExpiredTokens, 2 * 60 * 60 * 1000); // Example: Runs every 2 hours
+
 const User = mongoose.model('User', userSchema);
 
 module.exports = User;

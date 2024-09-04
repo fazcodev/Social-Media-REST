@@ -63,7 +63,7 @@ router.get('/:username/posts', async (req, res) => {
             Bucket: process.env.BUCKET_NAME,
             Key: user.posts[index].imageName,
           }),
-          { expiresIn: 60 }
+          { expiresIn: 60 * 10 }
         );
         const like = await Like.findOne({
           post: user.posts[index]._id,
@@ -99,7 +99,7 @@ router.get('/posts/:id', auth, async (req, res) => {
           Bucket: process.env.BUCKET_NAME,
           Key: post.imageName,
         }),
-        { expiresIn: 60 }
+        { expiresIn: 60 * 10 }
       );
     }
     const like = await Like.findOne({

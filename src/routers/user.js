@@ -1,5 +1,6 @@
 const express = require('express');
 const auth = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
 const router = new express.Router();
 const User = require('../models/User');
 const Follow = require('../models/Follow');
@@ -30,7 +31,7 @@ router.post('/users', async (req, res) => {
       httpOnly: true,
       secure: true, // set to false if testing locally over HTTP
       sameSite: 'None', // use 'Lax' or 'Strict' for local testing without HTTPS
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 3 * 60 * 60 * 1000, // 24 hours
     });
     // res.status(201).json({ user, token });
     res.status(201).json({ user });
@@ -39,9 +40,48 @@ router.post('/users', async (req, res) => {
   }
 });
 
+router.post('/users/oauth-login', async (req, res) => {
+  let user = await User.findOne({ username: req.body.user.username });
+  if (!user) {
+    user = new User(req.body.user);
+    await user.save();
+  } else {
+    user = await User.findOne({
+      username: req.body.user.username,
+      email: req.body.user.email,
+      OAuth: req.body.OAuth,
+    });
+    if (!user) {
+      user = new User({
+        username: `${req.body.user.username}1`,
+        ...req.body.user,
+      });
+      await user.save();
+    }
+  }
+
+  try {
+    const token = await user.saveOAuthToken(req.body.token, req.body.OAuth);
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: true, // set to false if testing locally over HTTP
+      sameSite: 'None', // use 'Lax' or 'Strict' for local testing without HTTPS
+      maxAge: 3 * 60 * 60 * 1000,
+    });
+    res.cookie('isOAuth', true, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None',
+      maxAge: 3 * 60 * 60 * 1000,
+    });
+    res.status(201).json({ user });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 router.post('/users/login', async (req, res) => {
   try {
-    // console.log('trying login')
     const user = await User.findByCredentials(
       req.body.username,
       req.body.password
@@ -53,7 +93,7 @@ router.post('/users/login', async (req, res) => {
       httpOnly: true,
       secure: true, // set to false if testing locally over HTTP
       sameSite: 'None', // use 'Lax' or 'Strict' for local testing without HTTPS
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 3 * 60 * 60 * 1000,
     });
     // res.status(201).json({ user, token });
     res.status(201).json({ user });
@@ -63,6 +103,18 @@ router.post('/users/login', async (req, res) => {
 });
 
 router.get('/users/me', auth, async (req, res) => {
+  if (req.user.avatarKey) {
+    req.user.avatarURL = await getSignedUrl(
+      s3,
+      new GetObjectCommand({
+        Bucket: process.env.BUCKET_NAME,
+        Key: req.user.avatarKey,
+      }),
+      // expires after 1 week
+      { expiresIn: 60 * 60 * 24 } // 10 years
+    );
+    await req.user.save();
+  }
   res.json(req.user);
 });
 
@@ -100,6 +152,7 @@ router.post(
           })
         );
       }
+
       user.avatarKey = req.file.key;
       user.avatarURL = await getSignedUrl(
         s3,
@@ -107,8 +160,8 @@ router.post(
           Bucket: process.env.BUCKET_NAME,
           Key: user.avatarKey,
         }),
-        // expires after 1week
-        { expiresIn: 60 * 60 * 24 * 6 }
+        // expires after 1 week
+        { expiresIn: 60 * 60 * 24 * 7 } // 10 years
       );
       await user.save();
       res.json(user);
@@ -151,7 +204,6 @@ router.get('/users/me/user-suggestions', auth, async (req, res) => {
     );
     res.status(200).json(sortedSuggestedUsers);
   } catch (error) {
-    console.log(error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -256,8 +308,15 @@ router.delete('/users/:username/unfollow', auth, async (req, res) => {
 
 router.post('/users/logout', auth, async (req, res) => {
   try {
+    let cookieToken;
+    if (req.cookies.isOAuth) {
+      const decoded = jwt.verify(req.cookies.token, process.env.JWT_SECRET);
+      cookieToken = decoded.token;
+    } else {
+      cookieToken = req.cookies.token;
+    }
     req.user.tokens = req.user.tokens.filter((token) => {
-      return token.token !== req.cookies.token;
+      return token.token !== cookieToken;
     });
     await req.user.save();
     res.cookie('token', '', {
@@ -265,6 +324,12 @@ router.post('/users/logout', auth, async (req, res) => {
       secure: true,
       expires: new Date(0), // Set the cookie's expiry date to the past
     });
+    res.cookie('isOAuth', '', {
+      httpOnly: true,
+      secure: true,
+      expires: new Date(0), // Set the cookie's expiry date to the past
+    });
+
     res.json({ message: 'Logout successfully' });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -277,6 +342,11 @@ router.post('/users/logoutall', auth, async (req, res) => {
 
     await req.user.save();
     res.cookie('token', '', {
+      httpOnly: true,
+      secure: true,
+      expires: new Date(0), // Set the cookie's expiry date to the past
+    });
+    res.cookie('isOAuth', '', {
       httpOnly: true,
       secure: true,
       expires: new Date(0), // Set the cookie's expiry date to the past

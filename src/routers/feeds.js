@@ -18,50 +18,62 @@ const s3 = new S3Client({
 
 router.get('/feeds', auth, async (req, res) => {
   try {
+    // Fetch the list of userIds that the current user is following
     const followings = await Follow.find(
       { follower: req.user._id },
       'following'
     );
     const userIds = followings.map((following) => following.following);
 
-    let posts;
-    if (userIds.length === 0) {
-      // If user is not following anyone then show all posts except user's own posts
-      posts = await Post.find({ owner: { $ne: req.user._id } })
-        .populate('owner', ['name', 'username', 'avatarURL'])
-        .sort({ createdAt: -1 })
-        .skip(parseInt(req.query.skip))
-        .limit(parseInt(req.query.limit));
-    } else {
-      posts = await Post.find({ owner: { $in: userIds } })
-        .populate('owner', ['name', 'username', 'avatarURL'])
-        .sort({ createdAt: -1 })
-        .skip(parseInt(req.query.skip))
-        .limit(parseInt(req.query.limit));
-    }
-    for (const index in posts) {
-      if (posts[index].imageName) {
-        posts[index].imageUrl = await getSignedUrl(
-          s3,
-          new GetObjectCommand({
-            Bucket: process.env.BUCKET_NAME,
-            Key: posts[index].imageName,
-          }),
-          { expiresIn: 60 }
-        );
-        const like = await Like.findOne({
-          post: posts[index]._id,
-          user: req.user._id,
-        });
-        const saved = await Saved.findOne({
-          post: posts[index]._id,
-          user: req.user._id,
-        });
-        posts[index].isLiked = like ? true : false;
-        posts[index].isSaved = saved ? true : false;
-      }
-    }
-    res.status(200).json(posts);
+    // Determine the query to fetch posts
+    const postQuery =
+      userIds.length === 0
+        ? { owner: { $ne: req.user._id } } // If not following anyone, show all posts except user's own
+        : { owner: { $in: userIds } }; // Otherwise, show posts from followed users
+
+    // Fetch posts with pagination
+    const posts = await Post.find(postQuery)
+      .populate('owner', ['name', 'username', 'avatarURL', 'avatarKey'])
+      .sort({ createdAt: -1 })
+      .skip(parseInt(req.query.skip))
+      .limit(parseInt(req.query.limit));
+
+    // Enhance posts with signed URLs and like/save status
+    const enhancedPosts = await Promise.all(
+      posts.map(async (post) => {
+        if (post.imageName) {
+          post.imageUrl = await getSignedUrl(
+            s3,
+            new GetObjectCommand({
+              Bucket: process.env.BUCKET_NAME,
+              Key: post.imageName,
+            }),
+            { expiresIn: 60 }
+          );
+        }
+        if (post.owner.avatarKey) {
+          post.owner.avatarURL = await getSignedUrl(
+            s3,
+            new GetObjectCommand({
+              Bucket: process.env.BUCKET_NAME,
+              Key: post.owner.avatarKey,
+            }),
+            { expiresIn: 60 * 60 * 24 * 7 }
+          );
+        }
+        post.save();
+        const [like, saved] = await Promise.all([
+          Like.findOne({ post: post._id, user: req.user._id }),
+          Saved.findOne({ post: post._id, user: req.user._id }),
+        ]);
+
+        post.isLiked = !!like;
+        post.isSaved = !!saved;
+        return post;
+      })
+    );
+
+    res.status(200).json(enhancedPosts);
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ error: 'Server Error' });
