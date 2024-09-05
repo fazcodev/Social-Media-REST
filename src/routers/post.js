@@ -161,6 +161,7 @@ router.delete('/posts/:id', auth, async (req, res) => {
         })
       );
     }
+    await Saved.deleteMany({ post: post._id });
     await User.findOneAndUpdate(
       { _id: req.user._id },
       { $inc: { postsCnt: -1 } }
@@ -295,34 +296,57 @@ router.delete('/posts/:id/comment/:commentId', auth, async (req, res) => {
 
 router.get('/posts/:username/saved', auth, async (req, res) => {
   try {
-    const saved = await Saved.find({
-      user: req.user._id,
-    }).populate({
-      path: 'post',
-      populate: { path: 'owner', select: 'name username avatarURL' },
-      sort: { createdAt: -1 },
-    });
-    for (const index in saved) {
-      if (saved[index].post.imageName) {
-        saved[index].post.imageUrl = await getSignedUrl(
-          s3,
-          new GetObjectCommand({
-            Bucket: process.env.BUCKET_NAME,
-            Key: saved[index].post.imageName,
-          }),
-          { expiresIn: 60 }
-        );
-        const like = await Like.findOne({
-          post: saved[index].post._id,
-          user: req.user._id,
-        });
-        saved[index].post.isLiked = like ? true : false;
-        saved[index].post.isSaved = true;
-        saved[index] = saved[index].post;
-      }
+    const skip = req.query.skip ? parseInt(req.query.skip, 10) : 0;
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 3;
+
+    // Fetch saved posts with user filtering and pagination
+    const savedPosts = await Saved.find({ user: req.user._id })
+      .populate({
+        path: 'post',
+        populate: { path: 'owner', select: 'name username avatarURL' },
+      })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    // If there are no saved posts, return empty array
+    if (!savedPosts.length) {
+      return res.status(200).json([]);
     }
-    res.status(200).json(saved);
+
+    // Process posts to attach image URLs and like/saved status
+    console.log(savedPosts);
+    const enhancedPosts = await Promise.all(
+      savedPosts.map(async (savedItem) => {
+        const post = savedItem.post;
+
+        if (post.imageName) {
+          post.imageUrl = await getSignedUrl(
+            s3,
+            new GetObjectCommand({
+              Bucket: process.env.BUCKET_NAME,
+              Key: post.imageName,
+            }),
+            { expiresIn: 60 * 10 } // 10 minutes
+          );
+        }
+
+        const [like] = await Promise.all([
+          Like.findOne({ post: post._id, user: req.user._id }),
+        ]);
+
+        // Attach isLiked and isSaved properties
+        post.isLiked = !!like;
+        post.isSaved = true;
+
+        return post;
+      })
+    );
+
+    // Return the enhanced posts
+    res.status(200).json(enhancedPosts);
   } catch (e) {
+    console.error(e);
     res.status(400).json({ error: e.message });
   }
 });
