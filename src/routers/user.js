@@ -111,7 +111,7 @@ router.get('/users/me', auth, async (req, res) => {
         Key: req.user.avatarKey,
       }),
       // expires after 1 week
-      { expiresIn: 60 * 60 * 24 } // 10 years
+      { expiresIn: 60 * 60 * 24 * 7 } // 10 years
     );
     await req.user.save();
   }
