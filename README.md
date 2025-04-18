@@ -1,58 +1,55 @@
-# social-media-REST
+# SnapMedia Backend (REST API)
 
-## Tech Stack
+This is the REST API backend for SnapMedia, a social media platform. It provides endpoints for user authentication, profile management, posts, feeds, and exploration features. Built with Node.js, Express, and Mongoose, it interacts with MongoDB for data persistence.
 
-- Node Js
-- Express
-- MongoDB
+## API Routes
 
-# Environment Variables
+### User Routes
 
-```
-JWT_SECRET=SECRED_KEY_FOR_JWT
-MONGODB_URL_DEV=MONGODB_SERVER_URL
-PORT=3000
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/users` | Get users list |
+| `POST` | `/users` | Create new user (Sign up) |
+| `POST` | `/users/oauth-login` | Authenticate user via OAuth |
+| `POST` | `/users/login` | Authenticate user (Login) |
+| `GET` | `/users/me` | Get current authenticated user profile |
+| `PATCH` | `/users/me` | Update current user profile details |
+| `POST` | `/users/me/avatar` | Upload or update user avatar |
+| `GET` | `/users/me/user-suggestions` | Get suggestions of users to follow |
+| `GET` | `/users/search` | Search for other users |
+| `PATCH` | `/users/me/change-password` | Change authenticated user's password |
+| `GET` | `/users/me/liked` | Get list of posts liked by current user |
+| `GET` | `/users/:username` | Find and retrieve user by username |
+| `GET` | `/users/:username/followers` | Get followers list for a specific user |
+| `GET` | `/users/:username/followings` | Get followings list for a specific user |
+| `POST` | `/users/:username/follow` | Follow a specific user |
+| `DELETE` | `/users/:username/unfollow` | Unfollow a specific user |
+| `POST` | `/users/logout` | Logout from current session |
+| `POST` | `/users/logoutall` | Logout from all active sessions |
+| `DELETE` | `/users/me` | Delete current user account |
 
-# API Docs
+### Post Routes
 
-## User Routes
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/posts` | Create a new post |
+| `GET` | `/:username/posts` | Get all posts authored by a specific user |
+| `GET` | `/posts/:id` | Get details of a specific post |
+| `PATCH` | `/posts/:id` | Update an existing post |
+| `DELETE` | `/posts/:id` | Delete a specific post |
+| `POST` | `/posts/:id/like` | Like a specific post |
+| `POST` | `/posts/:id/unlike` | Unlike a specific post |
+| `GET` | `/posts/:id/likes` | Get all likes for a post |
+| `GET` | `/posts/:id/comments` | Get all comments on a post |
+| `POST` | `/posts/:id/comment` | Add a comment to a post |
+| `DELETE` | `/posts/:id/comment/:commentId` | Delete a specific comment from a post |
+| `GET` | `/posts/:username/saved` | Get saved posts for a user |
+| `POST` | `/posts/:id/save` | Save a post to bookmarks |
+| `DELETE` | `/posts/:id/unsave` | Remove a post from bookmarks |
 
-### Authorization Header
+### Feed & Explore Routes
 
-`Bearer <token>`
-
-| Route                       | Method | Description                                                           |
-| :-------------------------- | :----- | :-------------------------------------------------------------------- |
-| /users                      | GET    | Returns a message: "User Router"                                      |
-| /users                      | POST   | Creates a new user and returns user details with authentication token |
-| /users/login                | POST   | Authenticates user and returns user details with authentication token |
-| /users/me                   | GET    | Returns the authenticated user's details                              |
-| /users/me                   | PATCH  | Updates the authenticated user's details                              |
-| /users/me/change-password   | PATCH  | Updates the authenticated user's password                             |
-| /users/me/liked             | GET    | Returns the posts liked by the authenticated user                     |
-| /users/:username            | GET    | Returns the user details with the given username                      |
-| /users/:username/followers  | GET    | Returns the followers of the user with the given username             |
-| /users/:username/followings | GET    | Returns the users followed by the user with the given username        |
-| /users/:username/follow     | POST   | Follows the user with the given username                              |
-| /users/:username/unfollow   | DELETE | Unfollows the user with the given username                            |
-| /users/logout               | POST   | Logs out the authenticated user from the current session              |
-| /users/logoutall            | POST   | Logs out the authenticated user from all sessions                     |
-| /users/me                   | DELETE | Deletes the authenticated user's account                              |
-
-### POST Routes
-
-#### Authorization Header
-
-`Bearer <token>`
-
-| Method | Endpoint          | Description                                 |
-| ------ | ----------------- | ------------------------------------------- |
-| POST   | /posts            | Create a new post                           |
-| GET    | /posts            | Get all posts created by authenticated user |
-| GET    | /posts/:id        | Get a post by ID                            |
-| PATCH  | /posts/:id        | Update a post by ID                         |
-| DELETE | /posts/:id        | Delete a post by ID                         |
-| POST   | /posts/:id/like   | Like a post by ID                           |
-| POST   | /posts/:id/unlike | Unlike a post by ID                         |
-| GET    | /posts/:id/likes  | Get all likes of a post by ID               |
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/feeds` | Retrieve user interaction and subscription feeds |
+| `GET` | `/explore` | Explore random and trending posts |
