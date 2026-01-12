@@ -47,15 +47,13 @@ postSchema.virtual('comments', {
   localField: '_id',
   foreignField: 'post',
 });
-postSchema.pre('save', async function (next) {
+postSchema.pre('save', async function () {
   const post = this;
-  next();
 });
-postSchema.pre('remove', async function (next) {
+postSchema.pre('remove', async function () {
   const post = this;
   await Like.deleteMany({ post: post._id });
   await Comment.deleteMany({ post: post._id });
-  next();
 });
 const Post = mongoose.model('Post', postSchema);
 module.exports = Post;

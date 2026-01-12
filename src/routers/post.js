@@ -58,6 +58,9 @@ router.get('/:username/posts', async (req, res) => {
     // eslint-disable-next-line guard-for-in
     for (const index in user.posts) {
       const post = user.posts[index].toObject();
+      if (user.posts[index].owner && user.posts[index].owner.avatarURL) {
+        post.owner.avatarURL = user.posts[index].owner.avatarURL;
+      }
       if (post.imageName) {
         post.imageUrl = await getSignedUrl(
           s3,
@@ -101,6 +104,9 @@ router.get('/posts/:id', auth, async (req, res) => {
       select: 'name username avatarKey',
     });
     const post = postdoc.toObject();
+    if (postdoc.owner && postdoc.owner.avatarURL) {
+      post.owner.avatarURL = postdoc.owner.avatarURL;
+    }
     if (post.imageName) {
       post.imageUrl = await getSignedUrl(
         s3,
@@ -330,6 +336,9 @@ router.get('/posts/:username/saved', auth, async (req, res) => {
     const enhancedPosts = await Promise.all(
       savedPosts.map(async (savedItem) => {
         const post = savedItem.post.toObject();
+        if (savedItem.post.owner && savedItem.post.owner.avatarURL) {
+          post.owner.avatarURL = savedItem.post.owner.avatarURL;
+        }
 
         if (post.imageName) {
           post.imageUrl = await getSignedUrl(

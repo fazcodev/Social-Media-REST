@@ -29,6 +29,17 @@ app.use('/api', ExploreRouter);
 app.get('*', (req, res) => {
   res.status(200).send('I am alive');
 });
+
+// Global error handler — catches URIError from malformed URL params (e.g. bare '%')
+app.use((err, req, res, next) => {
+  if (err instanceof URIError) {
+    return res
+      .status(400)
+      .json({ error: 'Malformed URL: invalid characters in request path' });
+  }
+  next(err);
+});
+
 app.listen(PORT, () => {
   console.log(`App Listening at http://localhost:${PORT}`);
 });

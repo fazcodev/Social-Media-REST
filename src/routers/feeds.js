@@ -42,6 +42,9 @@ router.get('/feeds', auth, async (req, res) => {
     const enhancedPosts = await Promise.all(
       posts.map(async (postdoc) => {
         const post = postdoc.toObject();
+        if (postdoc.owner && postdoc.owner.avatarURL) {
+          post.owner.avatarURL = postdoc.owner.avatarURL;
+        }
         if (post.imageName) {
           post.imageUrl = await getSignedUrl(
             s3,
@@ -52,7 +55,6 @@ router.get('/feeds', auth, async (req, res) => {
             { expiresIn: 3600 }
           );
         }
-        // post.owner.avatarURL generation removed - handled by middleware
 
         const [like, saved] = await Promise.all([
           Like.findOne({ post: post._id, user: req.user._id }),

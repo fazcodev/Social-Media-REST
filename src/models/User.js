@@ -29,6 +29,13 @@ const userSchema = mongoose.Schema(
       required: true,
       trim: true,
       lowercase: true,
+      validate(value) {
+        if (!/^[a-zA-Z0-9_.@-]+$/.test(value)) {
+          throw new Error(
+            'Username can only contain letters, numbers, dots, underscores, @ and hyphens'
+          );
+        }
+      },
     },
     email: {
       type: String,
@@ -207,12 +214,11 @@ userSchema.methods.unfollow = async function (username) {
   await Follow.findOneAndDelete({ _id: follow._id });
   return follow;
 };
-userSchema.pre('save', async function (next) {
+userSchema.pre('save', async function () {
   const user = this;
   if (user.isModified('password')) {
     user.password = await bcrypt.hash(user.password, 8);
   }
-  next();
 });
 
 // Automatically populate avatarURL when documents are fetched
@@ -246,7 +252,7 @@ userSchema.post('findOne', async function (doc) {
 });
 
 // delete user posts when user is removed
-userSchema.pre('remove', async function (next) {
+userSchema.pre('remove', async function () {
   const user = this;
   await Post.deleteMany({ owner: user._id });
   await Like.deleteMany({ user: user._id });
@@ -254,7 +260,6 @@ userSchema.pre('remove', async function (next) {
   // remove user from Follow
   await Follow.deleteMany({ follower: user._id });
   await Follow.deleteMany({ following: user._id });
-  next();
 });
 
 async function removeExpiredTokens() {
