@@ -5,6 +5,16 @@ const jwt = require('jsonwebtoken');
 const Post = require('./Post');
 const Follow = require('./Follow');
 const Like = require('./Like');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+
+const s3 = new S3Client({
+  credentials: {
+    accessKeyId: process.env.ACCESS_KEY,
+    secretAccessKey: process.env.SECRET_ACCESS_KEY,
+  },
+  region: process.env.BUCKET_REGION,
+});
 
 const userSchema = mongoose.Schema(
   {
@@ -82,9 +92,6 @@ const userSchema = mongoose.Schema(
     avatarKey: {
       type: String,
     },
-    avatarURL: {
-      type: String,
-    },
     postsCnt: {
       type: Number,
       default: 0,
@@ -133,7 +140,14 @@ userSchema.virtual('saved', {
 
 userSchema.methods.toJSON = function () {
   const user = this;
-  userObject = user.toObject();
+  const userObject = user.toObject();
+
+  // Explicitly include avatarURL since it's attached via middleware
+  // but not part of the schema (so toObject() strips it)
+  if (user.avatarURL) {
+    userObject.avatarURL = user.avatarURL;
+  }
+
   delete userObject.password;
   delete userObject.tokens;
   return userObject;
@@ -158,7 +172,6 @@ userSchema.methods.saveOAuthToken = async function (token, OAuth) {
   await user.save();
   return newToken;
 };
-
 userSchema.statics.findByCredentials = async (username, password) => {
   const user = await User.findOne({ username });
   if (!user) {
@@ -204,6 +217,37 @@ userSchema.pre('save', async function (next) {
   }
   next();
 });
+
+// Automatically populate avatarURL when documents are fetched
+userSchema.post('find', async function (docs) {
+  const promises = docs.map(async (doc) => {
+    if (doc.avatarKey) {
+      doc.avatarURL = await getSignedUrl(
+        s3,
+        new GetObjectCommand({
+          Bucket: process.env.BUCKET_NAME,
+          Key: doc.avatarKey,
+        }),
+        { expiresIn: 60 * 60 }
+      );
+    }
+  });
+  await Promise.all(promises);
+});
+
+userSchema.post('findOne', async function (doc) {
+  if (doc && doc.avatarKey) {
+    doc.avatarURL = await getSignedUrl(
+      s3,
+      new GetObjectCommand({
+        Bucket: process.env.BUCKET_NAME,
+        Key: doc.avatarKey,
+      }),
+      { expiresIn: 60 * 60 }
+    );
+  }
+});
+
 // delete user posts when user is removed
 userSchema.pre('remove', async function (next) {
   const user = this;

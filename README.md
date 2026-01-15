@@ -16,9 +16,9 @@ PORT=3000
 
 # API Docs
 
-### User Routes
+## User Routes
 
-#### Authorization Header
+### Authorization Header
 
 `Bearer <token>`
 

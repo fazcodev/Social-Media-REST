@@ -103,18 +103,8 @@ router.post('/users/login', async (req, res) => {
 });
 
 router.get('/users/me', auth, async (req, res) => {
-  if (req.user.avatarKey) {
-    req.user.avatarURL = await getSignedUrl(
-      s3,
-      new GetObjectCommand({
-        Bucket: process.env.BUCKET_NAME,
-        Key: req.user.avatarKey,
-      }),
-      // expires after 1 week
-      { expiresIn: 60 * 60 * 24 * 7 } // 10 years
-    );
-    await req.user.save();
-  }
+  // Middleware automatically populates avatarURL via avatarKey
+  // if (req.user.avatarKey) { ... } logic removed
   res.json(req.user);
 });
 
@@ -256,7 +246,8 @@ router.get('/users/:username', async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
     // also ppulate the posts of the user
     await user.populate({ path: 'posts' });
-    res.status(200).json(user);
+    const userObj = user.toJSON();
+    res.status(200).json(userObj);
   } catch (e) {
     res.status(400).json({ error: e.message });
   }

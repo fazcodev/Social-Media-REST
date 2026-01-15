@@ -33,7 +33,7 @@ router.get('/feeds', auth, async (req, res) => {
 
     // Fetch posts with pagination
     const posts = await Post.find(postQuery)
-      .populate('owner', ['name', 'username', 'avatarURL', 'avatarKey'])
+      .populate('owner', ['name', 'username', 'avatarKey'])
       .sort({ createdAt: -1 })
       .skip(parseInt(req.query.skip))
       .limit(parseInt(req.query.limit));
@@ -51,16 +51,7 @@ router.get('/feeds', auth, async (req, res) => {
             { expiresIn: 60 }
           );
         }
-        if (post.owner.avatarKey) {
-          post.owner.avatarURL = await getSignedUrl(
-            s3,
-            new GetObjectCommand({
-              Bucket: process.env.BUCKET_NAME,
-              Key: post.owner.avatarKey,
-            }),
-            { expiresIn: 60 * 60 * 24 * 7 }
-          );
-        }
+        // post.owner.avatarURL generation removed - handled by middleware
         post.save();
         const [like, saved] = await Promise.all([
           Like.findOne({ post: post._id, user: req.user._id }),

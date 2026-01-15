@@ -49,7 +49,7 @@ router.get('/:username/posts', async (req, res) => {
     // populate posts with user info only name and username and avatarURL
     await user.populate({
       path: 'posts',
-      populate: { path: 'owner', select: 'name username avatarURL' },
+      populate: { path: 'owner', select: 'name username avatarKey' },
       sort: { createdAt: -1 },
       skip: req.query.skip ? parseInt(req.query.skip, 10) : 0,
       limit: req.query.limit ? parseInt(req.query.limit, 10) : 3,
@@ -90,7 +90,7 @@ router.get('/posts/:id', auth, async (req, res) => {
       return res.status(404).json({ error: 'Post not found' });
     }
     // if found populate post with user info only name and username
-    await post.populate({ path: 'owner', select: 'name username avatarURL' });
+    await post.populate({ path: 'owner', select: 'name username avatarKey' });
     if (post.imageName) {
       post.imageUrl = await getSignedUrl(
         s3,
@@ -137,7 +137,7 @@ router.patch('/posts/:id', auth, async (req, res) => {
     updates.forEach((update) => (post[update] = req.body[update]));
     await post.save();
     // populate post with user info only name and username
-    await post.populate({ path: 'owner', select: 'name username avatarURL' });
+    await post.populate({ path: 'owner', select: 'name username avatarKey' });
     res.status(200).json(post);
   } catch (e) {
     res.status(400).send(e);
@@ -236,7 +236,7 @@ router.get('/posts/:id/comments', async (req, res) => {
     // populate comments with user info only name and username
     await post.populate({
       path: 'comments',
-      populate: { path: 'user', select: 'name username avatarURL' },
+      populate: { path: 'user', select: 'name username avatarKey' },
       options: {
         sort: { createdAt: -1 },
         skip: req.query.skip ? parseInt(req.query.skip, 10) : 0,
@@ -264,7 +264,7 @@ router.post('/posts/:id/comment', auth, async (req, res) => {
     });
     await comment.save();
     await post.updateOne({ $inc: { commentsCount: 1 } });
-    await comment.populate({ path: 'user', select: 'name username avatarURL' });
+    await comment.populate({ path: 'user', select: 'name username avatarKey' });
     res.status(201).json(comment);
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -302,7 +302,7 @@ router.get('/posts/:username/saved', auth, async (req, res) => {
     const savedPosts = await Saved.find({ user: req.user._id })
       .populate({
         path: 'post',
-        populate: { path: 'owner', select: 'name username avatarURL' },
+        populate: { path: 'owner', select: 'name username avatarKey' },
       })
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -314,7 +314,7 @@ router.get('/posts/:username/saved', auth, async (req, res) => {
     }
 
     // Process posts to attach image URLs and like/saved status
-    console.log(savedPosts);
+    // console.log(savedPosts);
     const enhancedPosts = await Promise.all(
       savedPosts.map(async (savedItem) => {
         const post = savedItem.post;

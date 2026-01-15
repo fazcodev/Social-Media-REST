@@ -53,7 +53,7 @@ router.get('/explore', auth, async (req, res) => {
     const ownerIds = posts.map((post) => post.owner);
     const owners = await User.find(
       { _id: { $in: ownerIds } },
-      'name username avatarURL'
+      'name username avatarKey'
     );
 
     const populatedPosts = posts.map((post) => {
