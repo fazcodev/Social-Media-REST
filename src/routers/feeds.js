@@ -40,7 +40,8 @@ router.get('/feeds', auth, async (req, res) => {
 
     // Enhance posts with signed URLs and like/save status
     const enhancedPosts = await Promise.all(
-      posts.map(async (post) => {
+      posts.map(async (postdoc) => {
+        const post = postdoc.toObject();
         if (post.imageName) {
           post.imageUrl = await getSignedUrl(
             s3,
@@ -48,11 +49,11 @@ router.get('/feeds', auth, async (req, res) => {
               Bucket: process.env.BUCKET_NAME,
               Key: post.imageName,
             }),
-            { expiresIn: 60 }
+            { expiresIn: 3600 }
           );
         }
         // post.owner.avatarURL generation removed - handled by middleware
-        post.save();
+
         const [like, saved] = await Promise.all([
           Like.findOne({ post: post._id, user: req.user._id }),
           Saved.findOne({ post: post._id, user: req.user._id }),

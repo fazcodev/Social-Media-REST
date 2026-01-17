@@ -28,19 +28,13 @@ const postSchema = mongoose.Schema(
       type: Number,
       default: 0,
     },
-    isLiked: {
-      type: Boolean,
-      default: false,
-    },
-    isSaved: {
-      type: Boolean,
-      default: false,
-    },
   },
   {
     timestamps: true,
   }
 );
+
+postSchema.index({ owner: 1, createdAt: -1 });
 
 postSchema.virtual('likes', {
   ref: 'Like',

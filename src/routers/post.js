@@ -54,29 +54,35 @@ router.get('/:username/posts', async (req, res) => {
       skip: req.query.skip ? parseInt(req.query.skip, 10) : 0,
       limit: req.query.limit ? parseInt(req.query.limit, 10) : 3,
     });
+    const posts = [];
+    // eslint-disable-next-line guard-for-in
     for (const index in user.posts) {
-      if (user.posts[index].imageName) {
-        user.posts[index].imageUrl = await getSignedUrl(
+      const post = user.posts[index].toObject();
+      if (post.imageName) {
+        post.imageUrl = await getSignedUrl(
           s3,
           new GetObjectCommand({
             Bucket: process.env.BUCKET_NAME,
-            Key: user.posts[index].imageName,
+            Key: post.imageName,
           }),
           { expiresIn: 60 * 10 }
         );
-        const like = await Like.findOne({
-          post: user.posts[index]._id,
-          user: user._id,
-        });
-        const saved = await Saved.findOne({
-          post: user.posts[index]._id,
-          user: user._id,
-        });
-        user.posts[index].isLiked = like ? true : false;
-        user.posts[index].isSaved = saved ? true : false;
+        const [like, saved] = await Promise.all([
+          Like.findOne({
+            post: post._id,
+            user: user._id, // Revert to user._id as route is public (no auth)
+          }),
+          Saved.findOne({
+            post: post._id,
+            user: user._id,
+          }),
+        ]);
+        post.isLiked = !!like;
+        post.isSaved = !!saved;
       }
+      posts.push(post);
     }
-    res.status(200).json(user.posts);
+    res.status(200).json(posts);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -85,12 +91,16 @@ router.get('/:username/posts', async (req, res) => {
 router.get('/posts/:id', auth, async (req, res) => {
   const _id = req.params.id;
   try {
-    const post = await Post.findById(_id);
-    if (!post) {
+    const postdoc = await Post.findById(_id);
+    if (!postdoc) {
       return res.status(404).json({ error: 'Post not found' });
     }
     // if found populate post with user info only name and username
-    await post.populate({ path: 'owner', select: 'name username avatarKey' });
+    await postdoc.populate({
+      path: 'owner',
+      select: 'name username avatarKey',
+    });
+    const post = postdoc.toObject();
     if (post.imageName) {
       post.imageUrl = await getSignedUrl(
         s3,
@@ -98,19 +108,21 @@ router.get('/posts/:id', auth, async (req, res) => {
           Bucket: process.env.BUCKET_NAME,
           Key: post.imageName,
         }),
-        { expiresIn: 60 * 10 }
+        { expiresIn: 3600 }
       );
     }
-    const like = await Like.findOne({
-      post: post._id,
-      user: req.user._id,
-    });
-    const saved = await Saved.findOne({
-      post: post._id,
-      user: req.user._id,
-    });
-    post.isLiked = like ? true : false;
-    post.isSaved = saved ? true : false;
+    const [like, saved] = await Promise.all([
+      Like.findOne({
+        post: post._id,
+        user: req.user._id,
+      }),
+      Saved.findOne({
+        post: post._id,
+        user: req.user._id,
+      }),
+    ]);
+    post.isLiked = !!like;
+    post.isSaved = !!saved;
     res.status(200).json(post);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -317,7 +329,7 @@ router.get('/posts/:username/saved', auth, async (req, res) => {
     // console.log(savedPosts);
     const enhancedPosts = await Promise.all(
       savedPosts.map(async (savedItem) => {
-        const post = savedItem.post;
+        const post = savedItem.post.toObject();
 
         if (post.imageName) {
           post.imageUrl = await getSignedUrl(
