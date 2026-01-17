@@ -141,9 +141,6 @@ userSchema.virtual('saved', {
 userSchema.methods.toJSON = function () {
   const user = this;
   const userObject = user.toObject();
-
-  // Explicitly include avatarURL since it's attached via middleware
-  // but not part of the schema (so toObject() strips it)
   if (user.avatarURL) {
     userObject.avatarURL = user.avatarURL;
   }

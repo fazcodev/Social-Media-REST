@@ -23,6 +23,8 @@ const commentSchema = mongoose.Schema(
   }
 );
 
+commentSchema.index({ post: 1, createdAt: 1 });
+
 const Comment = mongoose.model('Comment', commentSchema);
 
 module.exports = Comment;
